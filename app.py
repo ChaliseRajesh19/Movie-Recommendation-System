@@ -1,59 +1,61 @@
 import streamlit as st
 import pickle
 import requests
+import os
+
+# Load movies dataset
+movies = pickle.load(open("movies.pkl", "rb"))
+
+# Google Drive file ID
+file_id = "1XsTpNx726M2LmJAeEOr3aBIMh6UD8atR"
+similarity_file = "similarity.pkl"
+
+# Download similarity.pkl only if it doesn't exist
+if not os.path.exists(similarity_file):
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    response = requests.get(url)
+    with open(similarity_file, "wb") as f:
+        f.write(response.content)
+
+# Load similarity matrix
+with open(similarity_file, "rb") as f:
+    similarity = pickle.load(f)
 
 
+def fetch_poster(movie_id):
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US"
+    data = requests.get(url).json()
+    poster_path = data.get('poster_path')
+    if poster_path:
+        return f"https://image.tmdb.org/t/p/w500/{poster_path}"
+    else:
+        return None
 
-movies=pickle.load(open("movies.pkl","rb"))
 
-similarity= pickle.load(open('similarity.pkl','rb'))
 def recommend(movie):
     movie_index = movies[movies['title'] == movie].index[0]
     distances = similarity[movie_index]
-    movies_l = sorted(list(enumerate(distances)),reverse=True,key=lambda x:x[1])[1:6]
+    movies_l = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6]
 
     recommended_movies = []
-    recommended_movies_posters= []
-    
+    recommended_movies_posters = []
+
     for i in movies_l:
         movie_id = movies.iloc[i[0]].id
         recommended_movies.append(movies.iloc[i[0]].title)
         recommended_movies_posters.append(fetch_poster(movie_id))
-    return recommended_movies,recommended_movies_posters
+    return recommended_movies, recommended_movies_posters
 
 
-
-def fetch_poster(movie_id):
-    url = "https://api.themoviedb.org/3/movie/{}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US".format(movie_id)
-    data = requests.get(url)
-    data = data.json()
-    poster_path = data['poster_path']
-    full_path = "https://image.tmdb.org/t/p/w500/" + poster_path
-    return full_path
-
-
-movies_list = movies['title'].values
+# Streamlit UI
 st.title('Movie Recommendation System')
 
-selected_movie_name= st.selectbox("Choose the movies name one",options=movies_list)
+selected_movie_name = st.selectbox("Choose the movie", options=movies['title'].values)
 
 if st.button('Show Recommendation'):
-    names,poster = recommend(selected_movie_name)
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    with col1:
-        st.text(names[0])
-        st.image(poster[0])
-    with col2:
-        st.text(names[1])
-        st.image(poster[1])
-
-    with col3:
-        st.text(names[2])
-        st.image(poster[2])
-    with col4:
-        st.text(names[3])
-        st.image(poster[3])
-    with col5:
-        st.text(names[4])
-        st.image(poster[4])
+    names, posters = recommend(selected_movie_name)
+    cols = st.columns(5)
+    for idx, col in enumerate(cols):
+        col.text(names[idx])
+        if posters[idx]:
+            col.image(posters[idx])
