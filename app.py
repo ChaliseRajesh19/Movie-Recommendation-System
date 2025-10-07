@@ -10,18 +10,48 @@ movies = pickle.load(open("movies.pkl", "rb"))
 file_id = "1XsTpNx726M2LmJAeEOr3aBIMh6UD8atR"
 similarity_file = "similarity.pkl"
 
-# Download similarity.pkl only if it doesn't exist
-if not os.path.exists(similarity_file):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    response = requests.get(url)
-    with open(similarity_file, "wb") as f:
-        f.write(response.content)
 
-# Load similarity matrix
+# Function to download large Google Drive files properly
+def download_file_from_google_drive(file_id, destination):
+    URL = "https://docs.google.com/uc?export=download"
+    session = requests.Session()
+
+    response = session.get(URL, params={'id': file_id}, stream=True)
+    token = get_confirm_token(response)
+
+    if token:
+        params = {'id': file_id, 'confirm': token}
+        response = session.get(URL, params=params, stream=True)
+
+    save_response_content(response, destination)
+
+
+def get_confirm_token(response):
+    for key, value in response.cookies.items():
+        if key.startswith('download_warning'):
+            return value
+    return None
+
+
+def save_response_content(response, destination):
+    CHUNK_SIZE = 32768
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(CHUNK_SIZE):
+            if chunk:  # filter out keep-alive chunks
+                f.write(chunk)
+
+
+# Download similarity.pkl if not exists
+if not os.path.exists(similarity_file):
+    with st.spinner("Downloading similarity file..."):
+        download_file_from_google_drive(file_id, similarity_file)
+
+# Load similarity matrix safely
 with open(similarity_file, "rb") as f:
     similarity = pickle.load(f)
 
 
+# ========== Rest of your code ==========
 def fetch_poster(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US"
     data = requests.get(url).json()
@@ -48,9 +78,9 @@ def recommend(movie):
 
 
 # Streamlit UI
-st.title('Movie Recommendation System')
+st.title('🎬 Movie Recommendation System')
 
-selected_movie_name = st.selectbox("Choose the movie", options=movies['title'].values)
+selected_movie_name = st.selectbox("Choose a movie", options=movies['title'].values)
 
 if st.button('Show Recommendation'):
     names, posters = recommend(selected_movie_name)
