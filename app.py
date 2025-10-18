@@ -4,14 +4,15 @@ import numpy as np
 import requests
 import os
 
-# Load movies dataset
+# ---------------- Load movies dataset ----------------
 movies = pickle.load(open("movies.pkl", "rb"))
 
-# Google Drive file ID
-file_id = "1QcIHeRWphdtFm1szSD0rTgnWGgppqNqD"
-similarity_file = "similarity.npy"
+# ---------------- Google Drive file info ----------------
+# Make sure similarity_numeric.npy is uploaded to Drive
+file_id = "1QcIHeRWphdtFm1szSD0rTgnWGgppqNqD"  # Replace with your new numeric .npy ID if different
+similarity_file = "similarity_numeric.npy"
 
-# Function to download large Google Drive files safely
+# ---------------- Function to download large files from Google Drive ----------------
 def download_file_from_google_drive(id, destination):
     URL = "https://docs.google.com/uc?export=download"
     session = requests.Session()
@@ -33,15 +34,16 @@ def download_file_from_google_drive(id, destination):
             if chunk:
                 f.write(chunk)
 
-# Download similarity.npy if it doesn't exist
+# ---------------- Download similarity matrix if missing ----------------
 if not os.path.exists(similarity_file):
     with st.spinner("Downloading similarity matrix..."):
         download_file_from_google_drive(file_id, similarity_file)
 
-# Load similarity matrix safely
+# ---------------- Load similarity matrix safely ----------------
+# Must be numeric array to use memory mapping
 similarity = np.load(similarity_file, mmap_mode='r')  # memory-mapped, efficient
 
-# Movie recommendation functions
+# ---------------- Movie recommendation functions ----------------
 def fetch_poster(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US"
     data = requests.get(url).json()
@@ -63,7 +65,7 @@ def recommend(movie):
 
     return recommended_movies, recommended_movies_posters
 
-# Streamlit UI
+# ---------------- Streamlit UI ----------------
 st.title('🎬 Movie Recommendation System')
 
 selected_movie_name = st.selectbox("Choose a movie", options=movies['title'].values)
