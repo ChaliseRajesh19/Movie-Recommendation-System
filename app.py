@@ -10,38 +10,30 @@ movies = pickle.load(open("movies.pkl", "rb"))
 file_id = "1XsTpNx726M2LmJAeEOr3aBIMh6UD8atR"
 similarity_file = "similarity.pkl"
 
-
-# Function to download large Google Drive files properly
-def download_file_from_google_drive(file_id, destination):
+# Function to download large Google Drive files safely
+def download_file_from_google_drive(id, destination):
     URL = "https://docs.google.com/uc?export=download"
+
     session = requests.Session()
+    response = session.get(URL, params={'id': id}, stream=True)
+    token = None
 
-    response = session.get(URL, params={'id': file_id}, stream=True)
-    token = get_confirm_token(response)
-
-    if token:
-        params = {'id': file_id, 'confirm': token}
-        response = session.get(URL, params=params, stream=True)
-
-    save_response_content(response, destination)
-
-
-def get_confirm_token(response):
+    # Check for large file confirmation token
     for key, value in response.cookies.items():
         if key.startswith('download_warning'):
-            return value
-    return None
+            token = value
 
+    if token:
+        params = {'id': id, 'confirm': token}
+        response = session.get(URL, params=params, stream=True)
 
-def save_response_content(response, destination):
     CHUNK_SIZE = 32768
     with open(destination, "wb") as f:
         for chunk in response.iter_content(CHUNK_SIZE):
-            if chunk:  # filter out keep-alive chunks
+            if chunk:
                 f.write(chunk)
 
-
-# Download similarity.pkl if not exists
+# Download similarity.pkl if it doesn't exist
 if not os.path.exists(similarity_file):
     with st.spinner("Downloading similarity file..."):
         download_file_from_google_drive(file_id, similarity_file)
@@ -50,17 +42,14 @@ if not os.path.exists(similarity_file):
 with open(similarity_file, "rb") as f:
     similarity = pickle.load(f)
 
-
-# ========== Rest of your code ==========
+# ========== Movie Recommendation Functions ==========
 def fetch_poster(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US"
     data = requests.get(url).json()
     poster_path = data.get('poster_path')
     if poster_path:
         return f"https://image.tmdb.org/t/p/w500/{poster_path}"
-    else:
-        return None
-
+    return None
 
 def recommend(movie):
     movie_index = movies[movies['title'] == movie].index[0]
@@ -74,10 +63,10 @@ def recommend(movie):
         movie_id = movies.iloc[i[0]].id
         recommended_movies.append(movies.iloc[i[0]].title)
         recommended_movies_posters.append(fetch_poster(movie_id))
+
     return recommended_movies, recommended_movies_posters
 
-
-# Streamlit UI
+# ========== Streamlit UI ==========
 st.title('🎬 Movie Recommendation System')
 
 selected_movie_name = st.selectbox("Choose a movie", options=movies['title'].values)
